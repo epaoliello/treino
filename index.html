@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f47d6">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Treino">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Treino do Eduardo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: uma coluna estreita como uma ficha de academia; abas dos dias no topo, timer fixo no rodapé */
+:root {
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #14171c;
+  --muted: #5d6573;
+  --line: #d9dde4;
+  --accent: #1f47d6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2e8fb;
+  --done: #1d7a4f;
+  --done-soft: #dcf0e5;
+  --alarm: #d63a1f;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --body: "Barlow", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --surface: #181c22; --ink: #eceff3; --muted: #9aa3b1; --line: #2a3039;
+    --accent: #7d97ff; --accent-ink: #0f1216; --accent-soft: #1f2741;
+    --done: #5cc993; --done-soft: #183126; --alarm: #ff7a5c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --surface: #181c22; --ink: #eceff3; --muted: #9aa3b1; --line: #2a3039;
+  --accent: #7d97ff; --accent-ink: #0f1216; --accent-soft: #1f2741;
+  --done: #5cc993; --done-soft: #183126; --alarm: #ff7a5c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--body); font-size: 16px; line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 640px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 190px;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.top { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.eyebrow { font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; }
+
+nav.days {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); margin-top: 14px; padding-block: 8px;
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.day {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px;
+  padding: 8px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .04em; text-transform: uppercase;
+  position: relative; min-width: 0;
+}
+.day small { font-family: var(--body); font-weight: 500; font-size: 11px; color: var(--muted); letter-spacing: 0; text-transform: none; }
+.day[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.day[aria-selected="true"] small { color: inherit; opacity: .7; }
+.day.today::after { content: ""; position: absolute; top: 5px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+.dayhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 16px 0 10px; flex-wrap: wrap; }
+.dayhead h2 { font-family: var(--display); font-weight: 800; font-size: 28px; margin: 0; text-transform: uppercase; line-height: 1; }
+.dayhead h2 span { color: var(--muted); font-weight: 600; }
+.progress { font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.progress b { color: var(--done); }
+.note { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+
+ol.exs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ex {
+  display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: start;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 12px 10px;
+  transition: background .2s, border-color .2s;
+}
+.ex.done { background: var(--done-soft); border-color: transparent; }
+.check {
+  width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--line); background: transparent;
+  display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ex.done .check { background: var(--done); border-color: var(--done); color: var(--surface); }
+.ex-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ex h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.1; text-wrap: balance; }
+.ex h3 .part { display: block; }
+.ex h3 .plus { color: var(--accent); font-weight: 800; margin-right: 4px; }
+.ex.done h3 { color: var(--muted); }
+.series { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.series li {
+  font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px;
+  background: var(--bg); border-radius: 8px; padding: 3px 8px; overflow-wrap: anywhere;
+}
+.ex.done .series li { background: transparent; }
+.kg { color: var(--accent); font-weight: 600; }
+
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 20px; color: var(--muted); }
+.empty strong { color: var(--ink); display: block; font-family: var(--display); font-size: 20px; text-transform: uppercase; margin-bottom: 4px; }
+
+/* Ficha & arquivo */
+section.panel { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.card h2 { font-family: var(--display); font-weight: 800; font-size: 22px; text-transform: uppercase; margin: 0; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: 12px; padding: 12px 16px; min-height: 46px;
+  background: var(--accent); color: var(--accent-ink);
+  font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: .03em; text-transform: uppercase;
+}
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: .5; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row .btn { flex: 1 1 140px; }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.preview { display: flex; flex-direction: column; gap: 6px; }
+.preview table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.preview td { padding: 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.preview td:first-child { font-family: var(--display); font-weight: 700; text-transform: uppercase; width: 90px; }
+.preview td:last-child { color: var(--muted); }
+.msg { font-size: 15px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); }
+.msg.err { background: color-mix(in srgb, var(--alarm) 15%, var(--surface)); }
+ul.archive { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+ul.archive li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+ul.archive li:first-child { border-top: 0; }
+ul.archive .meta { min-width: 0; }
+ul.archive .meta b { display: block; font-family: var(--display); font-size: 18px; font-weight: 700; }
+ul.archive .meta span { color: var(--muted); font-size: 14px; }
+ul.archive .btn { min-height: 40px; padding: 8px 12px; font-size: 16px; flex: none; }
+
+/* Timer */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 10px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 24px rgba(0,0,0,.06);
+}
+.dock-in { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.dock-label { display: flex; justify-content: space-between; align-items: baseline; }
+.clock { font-family: var(--display); font-weight: 800; font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.dock.idle .clock { color: var(--muted); font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s linear; }
+.dock.idle .bar { visibility: hidden; }
+.timers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.timers .tbtn {
+  display: grid; place-items: center; text-decoration: none; -webkit-user-select: none; user-select: none;
+  border: 0; border-radius: 12px; min-height: 56px; background: var(--accent-soft); color: var(--accent);
+  font-family: var(--display); font-weight: 800; font-size: 26px; font-variant-numeric: tabular-nums;
+}
+.timers .tbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.timers .tbtn.on { background: var(--accent); color: var(--accent-ink); }
+.opt { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; }
+.opt input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--accent); }
+.opt span { min-width: 0; }
+.opt small { display: block; color: var(--muted); font-size: 14px; }
+code.cmd { display: block; font-size: 12px; background: var(--bg); border-radius: 8px; padding: 8px; overflow-wrap: anywhere; }
+.stop { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 6px 14px; font-family: var(--display); font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .04em; }
+.dock.ring { background: var(--alarm); border-top-color: var(--alarm); }
+.dock.ring .clock, .dock.ring .stop { color: #fff; border-color: rgba(255,255,255,.5); }
+.dock.ring .bar i { background: #fff; }
+@media (prefers-reduced-motion: no-preference) {
+  .dock.ring { animation: pulse .6s ease-in-out infinite alternate; }
+  @keyframes pulse { to { filter: brightness(1.15); } }
+}
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 15px; max-width: calc(100% - 32px); }
+@media (max-width: 380px) {
+  .day { font-size: 14px; }
+  .day small { font-size: 10px; }
+  h1 { font-size: 28px; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow" id="sub">Ficha de treino</div>
+    <h1 id="titulo">Treino do Eduardo</h1>
+  </header>
+
+  <nav class="days" id="days" role="tablist" aria-label="Dias da semana"></nav>
+
+  <main id="main"></main>
+</div>
+
+<div class="dock idle" id="dock">
+  <div class="dock-in">
+    <div class="dock-label">
+      <div class="clock" id="clock">Descanso</div>
+      <button class="stop" id="stop" hidden>Parar</button>
+    </div>
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="timers" id="timers">
+      <a class="tbtn" data-s="60" id="t60" href="#" role="button">1:00</a>
+      <a class="tbtn" data-s="90" id="t90" href="#" role="button">1:30</a>
+      <a class="tbtn" data-s="120" id="t120" href="#" role="button">2:00</a>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const SIGLAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const state = {
+  ficha: null,       // { titulo, carregadaEm, origem, treinos: [{ n, exercicios: [{ nome, series: [] }] }] }
+  arquivo: [],       // fichas anteriores, cada uma com arquivadaEm
+  tab: null,         // 0..5 = dia, "ficha"
+  pendente: null,    // ficha lida do PDF aguardando confirmação
+  msg: null,
+  loading: true,
+};
+let db = null, downloads = null;
+
+/* ---------- Leitura do PDF ---------- */
+
+// Agrupa os trechos de texto do pdf.js em linhas (mesma altura na página).
+async function pdfLines(buf) {
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const out = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const rows = [];
+    for (const it of tc.items) {
+      if (!("str" in it)) continue;
+      const y = it.transform[5], x = it.transform[4];
+      let row = rows.find((r) => Math.abs(r.y - y) < 3);
+      if (!row) { row = { y, parts: [] }; rows.push(row); }
+      row.parts.push({ x, s: it.str });
+    }
+    rows.sort((a, b) => b.y - a.y);
+    for (const r of rows) {
+      r.parts.sort((a, b) => a.x - b.x);
+      out.push(r.parts.map((q) => q.s).join(" "));
+    }
+  }
+  return out;
+}
+
+const RE_SERIE = /^\d+\s*[xX×]\s*[\d(]/;
+function parseFicha(lines) {
+  let titulo = "", ex = null, cur = null;
+  const treinos = [];
+  for (const raw of lines) {
+    const line = raw.replace(/\s+/g, " ").replace(/\s+([,)])/g, "$1").trim();
+    if (!/[0-9A-Za-zÀ-ÿ]/.test(line)) continue;
+    const m = line.match(/^TREINO\s*(\d+)\s*[:.\-–]?\s*(.*)$/i);
+    if (m) {
+      cur = { n: +m[1], exercicios: [] };
+      treinos.push(cur); ex = null;
+      continue;
+    }
+    if (!cur) { if (!titulo) titulo = line; continue; }
+    if (RE_SERIE.test(line)) {
+      if (!ex) { ex = { nome: "Exercício", series: [] }; cur.exercicios.push(ex); }
+      ex.series.push(line);
+      continue;
+    }
+    if (line.startsWith("(") && ex && ex.series.length) {
+      ex.series[ex.series.length - 1] += " " + line;
+      continue;
+    }
+    if (line.startsWith("+") && ex) {
+      ex.nome += " " + line;
+      continue;
+    }
+    let nome = line, serie = null;
+    const inl = line.match(/^(.*?[A-Za-zÀ-ÿ)])\s+(\d+\s*[xX×]\s*\d.*)$/);
+    if (inl) { nome = inl[1]; serie = inl[2]; }
+    if (ex && ex.series.length === 0 && ex.nome !== "Exercício") {
+      ex.nome += " " + nome; // nome quebrado em duas linhas
+    } else {
+      ex = { nome, series: [] };
+      cur.exercicios.push(ex);
+    }
+    if (serie) ex.series.push(serie);
+  }
+  treinos.sort((a, b) => a.n - b.n);
+  return { titulo: titulo || "Ficha de treino", treinos };
+}
+
+async function importPdfBuffer(buf, origem) {
+  const lines = await pdfLines(buf);
+  const f = parseFicha(lines);
+  if (!f.treinos.length) throw new Error("Não encontrei nenhum “TREINO 1:”, “TREINO 2:”… no PDF. Exporte a nota da ficha como PDF e tente de novo.");
+  f.origem = origem || "ficha.pdf";
+  return f;
+}
+window.importPdfBuffer = importPdfBuffer; // usado em testes
+
+/* ---------- Armazenamento ---------- */
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+async function carregar() {
+  if (db) {
+    try {
+      const [atual, arq] = await Promise.all([db.doc("ficha/atual").get(), db.collection("arquivo").get()]);
+      state.ficha = atual.exists ? atual.data() : null;
+      state.arquivo = arq.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      state.msg = { err: true, t: "Não consegui ler os dados salvos (" + (e.code || e.message) + "). Recarregue a página." };
+    }
+  } else {
+    state.ficha = LS.get("ficha", null);
+    state.arquivo = LS.get("arquivo", []);
+  }
+  state.arquivo.sort((a, b) => String(b.arquivadaEm).localeCompare(String(a.arquivadaEm)));
+  state.loading = false;
+}
+
+async function salvarNovaFicha(nova) {
+  const agora = new Date().toISOString();
+  nova = { ...nova, carregadaEm: agora };
+  const antiga = state.ficha;
+  let arquivada = null;
+  if (antiga) arquivada = { ...antiga, arquivadaEm: agora };
+  if (db) {
+    if (arquivada) {
+      const ref = db.collection("arquivo").doc("f" + Date.now());
+      await ref.set(arquivada);
+      arquivada.id = ref.id;
+    }
+    await db.doc("ficha/atual").set(nova);
+  } else {
+    if (arquivada) { arquivada.id = "f" + Date.now(); LS.set("arquivo", [arquivada, ...state.arquivo]); }
+    LS.set("ficha", nova);
+  }
+  if (arquivada) state.arquivo.unshift(arquivada);
+  state.ficha = nova;
+  return arquivada;
+}
+
+/* ---------- PDF do arquivo ---------- */
+
+const fmtData = (iso) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+
+function gerarPdf(f) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const M = 48, maxW = W - M * 2;
+  let y = M;
+  const need = (h) => { if (y + h > H - M) { doc.addPage(); y = M; } };
+  const txt = (s) => String(s).replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+  doc.text(txt(f.titulo || "Ficha de treino"), M, y + 6); y += 26;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100);
+  const periodo = "Usada de " + fmtData(f.carregadaEm) + (f.arquivadaEm ? " a " + fmtData(f.arquivadaEm) : " até hoje") + (f.origem ? "  ·  arquivo: " + f.origem : "");
+  doc.text(txt(periodo), M, y); y += 22;
+  doc.setTextColor(0);
+
+  for (const t of f.treinos) {
+    need(60);
+    doc.setDrawColor(30); doc.setLineWidth(1.2); doc.line(M, y, W - M, y); y += 18;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+    doc.text(txt((DIAS[t.n - 1] || "Dia extra") + "  —  Treino " + t.n), M, y); y += 18;
+    t.exercicios.forEach((e, i) => {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+      const nome = doc.splitTextToSize(txt((i + 1) + ". " + e.nome), maxW);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      const ser = e.series.flatMap((s) => doc.splitTextToSize(txt(s), maxW - 14));
+      need(nome.length * 14 + ser.length * 13 + 8);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+      doc.text(nome, M, y); y += nome.length * 14;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60);
+      ser.forEach((s) => { doc.text(s, M + 14, y); y += 13; });
+      doc.setTextColor(0);
+      y += 6;
+    });
+    y += 8;
+  }
+  return doc.output("blob");
+}
+
+async function baixarPdf(f) {
+  if (!window.jspdf) return toast("O gerador de PDF não carregou. Verifique a internet e recarregue.");
+  const nome = "Ficha " + fmtData(f.carregadaEm).replace(/\//g, "-") + (f.arquivadaEm ? " a " + fmtData(f.arquivadaEm).replace(/\//g, "-") : "") + ".pdf";
+  if (!downloads) {
+    // Fora do claude.ai: menu de compartilhar do iPhone (Salvar em Arquivos, AirDrop, Mail…).
+    const file = new File([gerarPdf(f)], nome, { type: "application/pdf" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: nome }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file); a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    return;
+  }
+  try {
+    await downloads.save({ filename: nome, data: gerarPdf(f) });
+    toast("PDF salvo.");
+  } catch (e) {
+    if (e && e.code === "declined") return;
+    toast("Não consegui salvar o PDF (" + (e && e.code || "erro") + ").");
+  }
+}
+
+/* ---------- Interface ---------- */
+
+const hojeIdx = () => { const d = new Date().getDay(); return d === 0 ? null : d - 1; };
+const hojeKey = () => new Date().toLocaleDateString("sv-SE");
+let feitos = LS.get("feitos", {});
+if (feitos.dia !== hojeKey()) feitos = { dia: hojeKey(), itens: {} };
+
+function serieHtml(s) {
+  return esc(s).replace(/\(([^()]*\d\s*(?:kg|placas?)[^()]*)\)/gi, '<span class="kg">($1)</span>');
+}
+function nomeHtml(nome) {
+  const parts = nome.split(/\s+\+\s+/).reduce((acc, p) => {
+    if (/^drop\b/i.test(p) && acc.length) acc[acc.length - 1] += " + " + p; else acc.push(p);
+    return acc;
+  }, []);
+  return parts.map((p, i) => `<span class="part">${i ? '<span class="plus">+</span>' : ""}${esc(p)}</span>`).join("");
+}
+
+function renderDays() {
+  const hoje = hojeIdx();
+  const nav = $("days");
+  nav.innerHTML = SIGLAS.map((s, i) => {
+    const t = state.ficha && state.ficha.treinos.find((x) => x.n === i + 1);
+    return `<button class="day${i === hoje ? " today" : ""}" role="tab" aria-selected="${state.tab === i}" data-tab="${i}">${s}<small>${t ? "T" + t.n : "—"}</small></button>`;
+  }).join("") + `<button class="day" role="tab" aria-selected="${state.tab === "ficha"}" data-tab="ficha">Ficha<small>${state.arquivo.length ? state.arquivo.length + " arq." : "PDF"}</small></button>`;
+}
+
+function renderDia(i) {
+  const t = state.ficha && state.ficha.treinos.find((x) => x.n === i + 1);
+  if (!state.ficha) {
+    return `<div class="empty"><strong>Nenhuma ficha carregada</strong>Abra a aba <b>Ficha</b> e envie o PDF da sua nota de treino. O app separa os treinos 1 a 6 de segunda a sábado.</div>`;
+  }
+  if (!t) return `<div class="dayhead"><h2>${DIAS[i]}</h2></div><div class="empty"><strong>Sem treino</strong>A ficha atual não tem o Treino ${i + 1}.</div>`;
+  const key = (j) => `${state.ficha.carregadaEm}|${t.n}|${j}`;
+  const nFeitos = t.exercicios.filter((_, j) => feitos.itens[key(j)]).length;
+  const domingo = hojeIdx() === null && i === 0 ? `<p class="note">Hoje é domingo, dia de descanso. Mostrando o treino de segunda.</p>` : "";
+  return `
+    <div class="dayhead"><h2>${DIAS[i]} <span>· Treino ${t.n}</span></h2>
+      <div class="progress"><b>${nFeitos}</b> de ${t.exercicios.length} feitos</div></div>
+    ${domingo}
+    <ol class="exs">${t.exercicios.map((e, j) => {
+      const ok = !!feitos.itens[key(j)];
+      return `<li class="ex${ok ? " done" : ""}">
+        <button class="check" data-feito="${esc(key(j))}" aria-pressed="${ok}" aria-label="Marcar ${esc(e.nome)} como feito">${ok ? "✓" : j + 1}</button>
+        <div class="ex-body"><h3>${nomeHtml(e.nome)}</h3>
+        ${e.series.length ? `<ul class="series">${e.series.map((s) => `<li>${serieHtml(s)}</li>`).join("")}</ul>` : ""}</div></li>`;
+    }).join("")}</ol>`;
+}
+
+function renderFicha() {
+  const f = state.ficha, p = state.pendente;
+  let h = `<section class="panel">`;
+  if (state.msg) h += `<div class="msg${state.msg.err ? " err" : ""}">${esc(state.msg.t)}</div>`;
+  if (p) {
+    h += `<div class="card"><h2>Confirme a nova ficha</h2>
+      <p>${esc(p.titulo)} · ${esc(p.origem)}</p>
+      <div class="preview"><table>${p.treinos.map((t) => `<tr><td>${DIAS[t.n - 1] || "Treino " + t.n}</td><td>Treino ${t.n} · ${t.exercicios.length} exercícios<br>${t.exercicios.map((e) => esc(e.nome)).join(" · ")}</td></tr>`).join("")}</table></div>
+      ${f ? `<p>A ficha atual (${esc(f.titulo)}) vai para o arquivo.</p>` : ""}
+      <div class="row"><button class="btn" id="confirmar">Usar esta ficha</button><button class="btn ghost" id="cancelar">Cancelar</button></div></div>`;
+  }
+  h += `<div class="card"><h2>Ficha atual</h2>
+    ${f ? `<p>${esc(f.titulo)} · carregada em ${fmtData(f.carregadaEm)} · ${f.treinos.length} treinos</p>` : `<p>Nenhuma ficha carregada ainda.</p>`}
+    <div class="row">
+      <label class="btn" for="pdfin">Enviar novo PDF<input type="file" id="pdfin" accept="application/pdf,.pdf"></label>
+      ${f ? `<button class="btn ghost" data-pdf="atual">PDF da atual</button>` : ""}
+    </div>
+    <p>No app Notas, abra a ficha, toque em Compartilhar › Imprimir › Salvar PDF (ou Exportar como PDF) e envie aqui.</p>
+    ${db ? "" : `<p>A ficha e o arquivo ficam salvos neste iPhone. Baixe o PDF das fichas arquivadas para guardar uma cópia.</p>`}</div>`;
+  h += `<div class="card"><h2>Timer do iPhone</h2>
+    <label class="opt"><input type="checkbox" id="opt-atalho" data-opt="atalho"${opts.atalho ? " checked" : ""}>
+      <span>Usar o atalho “Descanso”<small>Os botões 1:00, 1:30 e 2:00 abrem o app Atalhos e iniciam o timer do Relógio, que toca mesmo com a tela bloqueada. O timer da tela continua contando junto.</small></span></label>
+    <label class="opt"><input type="checkbox" id="opt-voltar" data-opt="voltar"${opts.voltar ? " checked" : ""}${opts.atalho ? "" : " disabled"}>
+      <span>Voltar para este app depois<small>Abre o app no Safari ao fim do atalho. Deixe desligado se você usa o app pela Tela de Início: volte pelo botão ◀ no canto da tela.</small></span></label>
+    <p>O atalho precisa se chamar <b>Descanso</b> e ter duas ações: “Obter Números de Entrada do Atalho” e “Iniciar timer de Números segundos”.</p></div>`;
+  h += `<div class="card"><h2>Arquivo</h2>`;
+  if (!state.arquivo.length) h += `<p>As fichas anteriores aparecem aqui quando você enviar uma nova. Cada uma vira um PDF com todos os dias.</p>`;
+  else h += `<ul class="archive">${state.arquivo.map((a) => `<li><div class="meta"><b>${esc(a.titulo)}</b><span>${fmtData(a.carregadaEm)} a ${fmtData(a.arquivadaEm)} · ${a.treinos.length} treinos</span></div><button class="btn ghost" data-pdf="${esc(a.id)}">PDF</button></li>`).join("")}</ul>`;
+  h += `</div></section>`;
+  return h;
+}
+
+function render() {
+  if (state.ficha) { $("titulo").textContent = state.ficha.titulo; $("sub").textContent = "Ficha de " + fmtData(state.ficha.carregadaEm); }
+  renderDays();
+  if (state.loading) { $("main").innerHTML = `<p class="note" style="margin-top:16px">Carregando ficha…</p>`; return; }
+  $("main").innerHTML = state.tab === "ficha" ? renderFicha() : renderDia(state.tab);
+}
+
+let toastT;
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), 3200); }
+
+document.addEventListener("click", async (ev) => {
+  const day = ev.target.closest("[data-tab]");
+  if (day) { const v = day.dataset.tab; state.tab = v === "ficha" ? "ficha" : +v; state.msg = null; render(); window.scrollTo({ top: 0 }); return; }
+  const chk = ev.target.closest("[data-feito]");
+  if (chk) { const k = chk.dataset.feito; if (feitos.itens[k]) delete feitos.itens[k]; else feitos.itens[k] = 1; LS.set("feitos", feitos); render(); return; }
+  const pdf = ev.target.closest("[data-pdf]");
+  if (pdf) { const id = pdf.dataset.pdf; const f = id === "atual" ? state.ficha : state.arquivo.find((a) => a.id === id); if (f) baixarPdf(f); return; }
+  if (ev.target.id === "cancelar") { state.pendente = null; render(); return; }
+  if (ev.target.id === "confirmar") {
+    ev.target.disabled = true;
+    try {
+      const arq = await salvarNovaFicha(state.pendente);
+      state.pendente = null;
+      state.msg = { t: arq ? "Ficha nova ativa. A anterior foi para o arquivo; toque em PDF para baixá-la." : "Ficha carregada." };
+    } catch (e) {
+      state.msg = { err: true, t: "Não consegui salvar a ficha (" + (e.code || e.message) + "). Tente de novo." };
+    }
+    render();
+  }
+});
+
+document.addEventListener("change", async (ev) => {
+  if (ev.target.id !== "pdfin") return;
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  state.msg = { t: "Lendo " + file.name + "…" }; state.pendente = null; render();
+  try {
+    if (!window.pdfjsLib) throw new Error("O leitor de PDF não carregou. Verifique a internet e recarregue.");
+    state.pendente = await importPdfBuffer(await file.arrayBuffer(), file.name);
+    state.msg = null;
+  } catch (e) {
+    state.msg = { err: true, t: e.message || "Não consegui ler esse PDF." };
+  }
+  render();
+});
+
+/* ---------- Timer de descanso ---------- */
+
+let actx = null, timer = null, wake = null;
+function audio() {
+  if (!actx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch {}
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function beep(at, freq, dur, vol) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = "square"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, at);
+  g.gain.linearRampToValueAtTime(vol, at + 0.01);
+  g.gain.setValueAtTime(vol, at + dur - 0.03);
+  g.gain.linearRampToValueAtTime(0, at + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(at); o.stop(at + dur + 0.02);
+  return o;
+}
+// Agenda o alarme no relógio de áudio já no início, para tocar no tempo certo mesmo se a página ficar lenta.
+function agendarAlarme(seg) {
+  const t0 = actx.currentTime + seg, nodes = [];
+  for (let k = 3; k >= 1; k--) if (t0 - k >= actx.currentTime) nodes.push(beep(t0 - k, 660, 0.09, 0.15));
+  for (let r = 0; r < 4; r++) for (let b = 0; b < 3; b++) nodes.push(beep(t0 + r * 0.9 + b * 0.18, 1040, 0.13, 0.35));
+  return nodes;
+}
+function fmt(s) { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+function iniciar(seg, btn) {
+  parar(true);
+  try { audio(); } catch {}
+  const nodes = actx ? agendarAlarme(seg) : [];
+  timer = { seg, fim: Date.now() + seg * 1000, nodes, btn, tocou: false };
+  document.querySelectorAll(".timers .tbtn").forEach((b) => b.classList.toggle("on", b === btn));
+  $("dock").className = "dock"; $("stop").hidden = false;
+  if (navigator.wakeLock) navigator.wakeLock.request("screen").then((w) => (wake = w)).catch(() => {});
+  tick();
+  timer.iv = setInterval(tick, 200);
+}
+function tick() {
+  if (!timer) return;
+  const rest = (timer.fim - Date.now()) / 1000;
+  if (rest > 0) {
+    $("clock").textContent = fmt(rest);
+    $("barfill").style.width = (100 * (1 - rest / timer.seg)) + "%";
+    return;
+  }
+  if (!timer.tocou) {
+    timer.tocou = true;
+    $("clock").textContent = "Tempo!";
+    $("barfill").style.width = "100%";
+    $("dock").className = "dock ring";
+    try { navigator.vibrate && navigator.vibrate([300, 150, 300, 150, 300]); } catch {}
+    timer.autoStop = setTimeout(() => parar(), 5000);
+  }
+}
+function parar(silencioso) {
+  if (!timer) return;
+  clearInterval(timer.iv); clearTimeout(timer.autoStop);
+  if (!timer.tocou || !silencioso) timer.nodes.forEach((n) => { try { n.stop(); } catch {} });
+  timer = null;
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+  document.querySelectorAll(".timers .tbtn").forEach((b) => b.classList.remove("on"));
+  $("dock").className = "dock idle"; $("clock").textContent = "Descanso"; $("stop").hidden = true; $("barfill").style.width = "0";
+}
+// Timer do iPhone: cada botão abre o atalho "Descanso" (app Atalhos), que inicia o timer do Relógio.
+// Dentro do claude.ai o app roda numa moldura que bloqueia links para outros apps; o atalho só funciona na versão do GitHub.
+const EMBUTIDO = !!window.claude;
+const APP_URL = EMBUTIDO ? "https://claude.ai/artifact/DXGGZj3r2L4xfM1TUuEVB4" : location.href.split("#")[0];
+const opts = Object.assign({ atalho: !EMBUTIDO, voltar: false }, LS.get("opts", {}));
+function linkAtalho(seg) {
+  let u = "shortcuts://x-callback-url/run-shortcut?name=Descanso&input=text&text=" + seg;
+  if (opts.voltar) u += "&x-success=" + encodeURIComponent(APP_URL);
+  return u;
+}
+function atualizarLinks() {
+  document.querySelectorAll(".timers .tbtn").forEach((a) => (a.href = opts.atalho ? linkAtalho(a.dataset.s) : "#"));
+}
+atualizarLinks();
+$("timers").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-s]");
+  if (!b) return;
+  if (!opts.atalho) ev.preventDefault(); // com o atalho ligado, o link segue para o app Atalhos
+  iniciar(+b.dataset.s, b);
+});
+$("stop").addEventListener("click", () => parar());
+$("dock").addEventListener("click", (ev) => { if (timer && timer.tocou && !ev.target.closest("button, a")) parar(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (actx && actx.state === "suspended") actx.resume();
+  // O relógio de áudio para enquanto o Atalhos está na frente: reagenda o alarme pelo tempo real restante.
+  if (timer && !timer.tocou && actx) {
+    timer.nodes.forEach((n) => { try { n.stop(); } catch {} });
+    const rest = (timer.fim - Date.now()) / 1000;
+    timer.nodes = rest > 0 ? agendarAlarme(rest) : [];
+  }
+  tick();
+});
+document.addEventListener("change", (ev) => {
+  const k = ev.target.dataset && ev.target.dataset.opt;
+  if (!k) return;
+  opts[k] = ev.target.checked; LS.set("opts", opts); atualizarLinks(); render();
+});
+
+/* ---------- Início ---------- */
+
+state.tab = hojeIdx() ?? 0;
+render();
+(async () => {
+  if (window.claude && claude.use) {
+    [db, downloads] = await Promise.all([
+      claude.use("db").catch(() => null),
+      claude.use("downloads").catch(() => null),
+    ]);
+  }
+  await carregar();
+  render();
+})();
+if (!EMBUTIDO) {
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {}
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+
+</body>
+</html>
