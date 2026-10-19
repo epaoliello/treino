@@ -103,6 +103,24 @@ ol.exs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction:
 }
 .ex.done .check { background: var(--done); border-color: var(--done); color: var(--surface); }
 .ex-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ex-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.ex-top h3 { min-width: 0; }
+.edit {
+  flex: none; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 4px 10px;
+  font-family: var(--display); font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+}
+.ex.editing { border-color: var(--accent); }
+.ed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ed-list li { display: flex; gap: 6px; }
+.ed-list input {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
+}
+.ed-list input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.ed-list .rm { flex: none; width: 40px; border: 1px solid var(--line); background: transparent; border-radius: 8px; font-size: 20px; color: var(--muted); }
+.ed-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ed-actions .btn { min-height: 40px; padding: 8px 14px; font-size: 16px; flex: 1 1 auto; }
+.edited { font-size: 13px; color: var(--muted); }
 .ex h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.1; text-wrap: balance; }
 .ex h3 .part { display: block; }
 .ex h3 .plus { color: var(--accent); font-weight: 800; margin-right: 4px; }
@@ -364,6 +382,12 @@ async function salvarNovaFicha(nova) {
   return arquivada;
 }
 
+// Grava a ficha atual depois de uma edição de séries/cargas.
+async function salvarFichaAtual() {
+  if (db) await db.doc("ficha/atual").set(state.ficha);
+  else LS.set("ficha", state.ficha);
+}
+
 /* ---------- PDF do arquivo ---------- */
 
 const fmtData = (iso) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
@@ -434,6 +458,7 @@ async function baixarPdf(f) {
 
 const hojeIdx = () => { const d = new Date().getDay(); return d === 0 ? null : d - 1; };
 const hojeKey = () => new Date().toLocaleDateString("sv-SE");
+let edicao = null; // { id: "treino|índice", series: [...] } enquanto um exercício está sendo editado
 let feitos = LS.get("feitos", {});
 if (feitos.dia !== hojeKey()) feitos = { dia: hojeKey(), itens: {} };
 
@@ -472,10 +497,23 @@ function renderDia(i) {
     ${domingo}
     <ol class="exs">${t.exercicios.map((e, j) => {
       const ok = !!feitos.itens[key(j)];
-      return `<li class="ex${ok ? " done" : ""}">
+      const id = t.n + "|" + j;
+      const ed = edicao && edicao.id === id;
+      const corpo = ed
+        ? `<ul class="ed-list">${edicao.series.map((s, k) => `<li>
+              <input id="ser-${t.n}-${j}-${k}" data-ser="${k}" value="${esc(s)}" autocomplete="off" aria-label="Série ${k + 1}">
+              <button class="rm" data-rmserie="${k}" aria-label="Remover série ${k + 1}">×</button></li>`).join("")}</ul>
+           <div class="ed-actions">
+             <button class="btn ghost" data-addserie>+ Série</button>
+             <button class="btn ghost" data-cancelar>Cancelar</button>
+             <button class="btn" data-salvar>Salvar</button></div>`
+        : `${e.series.length ? `<ul class="series">${e.series.map((s) => `<li>${serieHtml(s)}</li>`).join("")}</ul>` : ""}
+           ${e.editadoEm ? `<div class="edited">Alterado em ${fmtData(e.editadoEm)}</div>` : ""}`;
+      return `<li class="ex${ok ? " done" : ""}${ed ? " editing" : ""}">
         <button class="check" data-feito="${esc(key(j))}" aria-pressed="${ok}" aria-label="Marcar ${esc(e.nome)} como feito">${ok ? "✓" : j + 1}</button>
-        <div class="ex-body"><h3>${nomeHtml(e.nome)}</h3>
-        ${e.series.length ? `<ul class="series">${e.series.map((s) => `<li>${serieHtml(s)}</li>`).join("")}</ul>` : ""}</div></li>`;
+        <div class="ex-body"><div class="ex-top"><h3>${nomeHtml(e.nome)}</h3>
+          ${ed ? "" : `<button class="edit" data-editar="${id}" aria-label="Editar cargas de ${esc(e.nome)}">Editar</button>`}</div>
+        ${corpo}</div></li>`;
     }).join("")}</ol>`;
 }
 
@@ -523,7 +561,44 @@ function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false
 
 document.addEventListener("click", async (ev) => {
   const day = ev.target.closest("[data-tab]");
-  if (day) { const v = day.dataset.tab; state.tab = v === "ficha" ? "ficha" : +v; state.msg = null; render(); window.scrollTo({ top: 0 }); return; }
+  if (day) { const v = day.dataset.tab; state.tab = v === "ficha" ? "ficha" : +v; state.msg = null; edicao = null; render(); window.scrollTo({ top: 0 }); return; }
+  const editar = ev.target.closest("[data-editar]");
+  if (editar) {
+    const [n, j] = editar.dataset.editar.split("|").map(Number);
+    const e = state.ficha.treinos.find((t) => t.n === n).exercicios[j];
+    edicao = { id: editar.dataset.editar, series: e.series.length ? [...e.series] : [""] };
+    render();
+    const first = document.querySelector("[data-ser]");
+    if (first) { first.focus(); first.setSelectionRange(first.value.length, first.value.length); }
+    return;
+  }
+  if (edicao) {
+    if (ev.target.closest("[data-addserie]")) {
+      edicao.series.push(edicao.series[edicao.series.length - 1] || "");
+      render();
+      const ins = document.querySelectorAll("[data-ser]"); const last = ins[ins.length - 1];
+      if (last) { last.focus(); last.select(); }
+      return;
+    }
+    const rm = ev.target.closest("[data-rmserie]");
+    if (rm) { edicao.series.splice(+rm.dataset.rmserie, 1); render(); return; }
+    if (ev.target.closest("[data-cancelar]")) { edicao = null; render(); return; }
+    if (ev.target.closest("[data-salvar]")) {
+      const [n, j] = edicao.id.split("|").map(Number);
+      const e = state.ficha.treinos.find((t) => t.n === n).exercicios[j];
+      const antes = { series: e.series, editadoEm: e.editadoEm };
+      e.series = edicao.series.map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean);
+      e.editadoEm = new Date().toISOString();
+      try {
+        await salvarFichaAtual();
+        edicao = null; render(); toast("Cargas salvas.");
+      } catch (err) {
+        Object.assign(e, antes); render();
+        toast("Não consegui salvar (" + (err.code || err.message) + "). Tente de novo.");
+      }
+      return;
+    }
+  }
   const chk = ev.target.closest("[data-feito]");
   if (chk) { const k = chk.dataset.feito; if (feitos.itens[k]) delete feitos.itens[k]; else feitos.itens[k] = 1; LS.set("feitos", feitos); render(); return; }
   const pdf = ev.target.closest("[data-pdf]");
@@ -539,6 +614,16 @@ document.addEventListener("click", async (ev) => {
       state.msg = { err: true, t: "Não consegui salvar a ficha (" + (e.code || e.message) + "). Tente de novo." };
     }
     render();
+  }
+});
+
+document.addEventListener("input", (ev) => {
+  const k = ev.target.dataset && ev.target.dataset.ser;
+  if (edicao && k != null) edicao.series[+k] = ev.target.value;
+});
+document.addEventListener("keydown", (ev) => {
+  if (edicao && ev.key === "Enter" && ev.target.dataset && ev.target.dataset.ser != null) {
+    ev.preventDefault(); document.querySelector("[data-salvar]")?.click();
   }
 });
 
