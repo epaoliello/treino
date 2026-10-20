@@ -253,6 +253,14 @@ table.heat td.cell { text-align: center; font-weight: 600; background: color-mix
 table.heat td.cell.zero { color: var(--muted); }
 .del { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 2px 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .del.confirm { border-color: var(--alarm); color: var(--alarm); }
+.numin { width: 44px; padding: 6px 4px; text-align: center; }
+table.refs td { vertical-align: middle; padding: 3px 2px; }
+table.refs th { padding: 6px 2px; font-size: 11px; white-space: normal; text-align: center; }
+table.refs th:first-child { text-align: left; }
+table.refs td:first-child { font-size: 13px; }
+details summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+ul.fontes { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+ul.fontes a { color: var(--accent); }
 .src { font-size: 13px; color: var(--muted); }
 .src a { color: var(--accent); }
 
@@ -360,9 +368,9 @@ let apagar = null;     // id do registro do log aguardando confirmação para ap
 
 /* ---------- Grupos musculares e referências de volume (séries por semana) ---------- */
 
-// Valores gerais das diretrizes da Renaissance Periodization (Dr. Mike Israetel), em séries por semana.
-// [Manutenção (MV), MEV, MAV mínimo, MAV máximo, MRV]
-const REF = {
+// Séries por semana: [Manutenção (MV), MEV, MAV mínimo, MAV máximo, MRV]
+// Perfil 1: valores gerais da Renaissance Periodization (Dr. Mike Israetel).
+const REF_ISRAETEL = {
   "Peito":        [8, 10, 12, 20, 22],
   "Costas":       [8, 10, 14, 22, 25],
   "Ombro ant.":   [0, 0, 6, 8, 12],
@@ -379,27 +387,71 @@ const REF = {
   "Antebraço":    [0, 2, 10, 20, 25],
   "Lombar":       null,
 };
-const GRUPOS = Object.keys(REF);
+// Perfil 2: atleta avançado, síntese da literatura (ver FONTES). Os estudos medem sobretudo quadríceps,
+// bíceps e tríceps; para os demais grupos os valores são extrapolados na mesma proporção.
+const REF_AVANCADO = {
+  "Peito":        [6, 12, 14, 22, 26],
+  "Costas":       [6, 12, 16, 24, 28],
+  "Ombro ant.":   [0, 0, 6, 10, 14],
+  "Ombro lat.":   [6, 10, 16, 24, 28],
+  "Ombro post.":  [4, 8, 14, 22, 26],
+  "Bíceps":       [6, 10, 14, 22, 28],
+  "Tríceps":      [6, 10, 14, 24, 30],
+  "Quadríceps":   [6, 12, 14, 24, 32],
+  "Posteriores":  [4, 8, 12, 20, 24],
+  "Glúteos":      [0, 4, 8, 16, 20],
+  "Panturrilha":  [6, 10, 14, 20, 24],
+  "Abdômen":      [0, 4, 12, 20, 25],
+  "Trapézio":     [0, 4, 12, 20, 26],
+  "Antebraço":    [0, 4, 10, 20, 25],
+  "Lombar":       null,
+};
+const GRUPOS = Object.keys(REF_ISRAETEL);
+const PERFIS = { israetel: "Israetel (geral)", avancado: "Avançado (literatura)", personalizado: "Personalizado" };
+const FONTES = {
+  israetel: [
+    ["Renaissance Periodization (Israetel): volume landmarks por grupo muscular", "https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth"],
+    ["TreinoAI: Volume de treino, o guia definitivo", "https://www.treinoai.com.br/academy/blog/volume-de-treino-o-guia-definitivo"],
+    ["Hipertrofia.org: Volume de treino para hipertrofia", "https://www.hipertrofia.org/blog/2020/11/24/volume-de-treino-para-hipertrofia/"],
+  ],
+  avancado: [
+    ["Baz-Valle et al. (2022), J Hum Kinet: 12–20 séries/semana como faixa ótima em treinados; acima de 20 melhor só para tríceps", "https://pmc.ncbi.nlm.nih.gov/articles/PMC8884877/"],
+    ["Schoenfeld, Ogborn & Krieger (2017), J Sports Sci: dose-resposta; 10+ séries/semana superam volumes menores", "https://pubmed.ncbi.nlm.nih.gov/27433992/"],
+    ["Schoenfeld et al. (2019), Med Sci Sports Exerc: 5 séries por exercício (~30/semana) aumentaram mais o quadríceps em treinados", "https://pubmed.ncbi.nlm.nih.gov/30153194/"],
+    ["Brigatto et al. (2022), J Strength Cond Res: 32 séries/semana superaram 16 em quadríceps e tríceps", "https://pubmed.ncbi.nlm.nih.gov/31868813/"],
+    ["Aube et al. (2022), J Strength Cond Res: 12, 18 e 24 séries/semana sem diferença de espessura do quadríceps", "https://pubmed.ncbi.nlm.nih.gov/32058362/"],
+    ["Enes et al. (2024), Med Sci Sports Exerc: progressão de 22 até ~52 séries de quadríceps; ganho extra de força, hipertrofia pouco maior", "https://pubmed.ncbi.nlm.nih.gov/37796222/"],
+    ["Pelland et al. (2024/2026), Sports Med: 67 estudos; mais volume, mais hipertrofia, com retorno decrescente; séries indiretas valem 0,5", "https://sportrxiv.org/index.php/server/preprint/view/460"],
+    ["Räntilä & Ahtiainen (2026), J Sci Sport Exerc: 1,5× o volume em atletas não aumentou hipertrofia nem força", "https://journal.hep.com.cn/josisae/EN/10.1007/s42978-026-00387-7"],
+    ["Spiering et al. (2021), J Strength Cond Res: 1 sessão e 1 série por exercício por semana mantêm força e massa em jovens, se a carga for mantida", "https://pubmed.ncbi.nlm.nih.gov/33629972/"],
+  ],
+};
+// Ajustes de referência: perfil ativo, tabela personalizada e peso das séries indiretas.
+let config = { perfil: "avancado", custom: null, indireta: 0.5 };
+const R = () => config.perfil === "israetel" ? REF_ISRAETEL : config.perfil === "personalizado" && config.custom ? config.custom : REF_AVANCADO;
 
-// Palavras-chave do nome do exercício → grupos. Todas as regras que casam são somadas.
+// Palavras-chave do nome do exercício → grupos. [regra, grupos diretos, grupos indiretos]. Todas as regras que casam são somadas.
 const REGRAS = [
-  [/crucifixo inverso|voador inverso|face ?pull|deltoide posterior/i, ["Ombro post."]],
-  [/eleva[çc][ãa]o lateral/i, ["Ombro lat."]],
-  [/eleva[çc][ãa]o frontal|desenvolvimento/i, ["Ombro ant."]],
-  [/encolhimento/i, ["Trapézio"]],
-  [/tr[ií]ceps/i, ["Tríceps"]],
-  [/antebra[çc]o|rosca (de )?punho/i, ["Antebraço"]],
-  [/b[ií]ceps|rosca(?! (de )?punho)/i, ["Bíceps"]],
-  [/panturrilha|s[óo]leo|g[êe]meos/i, ["Panturrilha"]],
-  [/abdominal|abominal|prancha|roller|obl[ií]quo|crunch/i, ["Abdômen"]],
-  [/stiff|terra romeno|good morning/i, ["Posteriores", "Glúteos"]],
-  [/flexora|flexor|n[óo]rdica|flex[ãa]o de joelho/i, ["Posteriores"]],
-  [/extens[ãa]o de quadril|gl[úu]teo|eleva[çc][ãa]o p[ée]lvica|abdu[çc][ãa]o/i, ["Glúteos"]],
-  [/extens[ãa]o de tronco|lombar|hiperextens/i, ["Lombar"]],
-  [/agachamento|leg.?press|hack|passada|afundo|a fundo|b[úu]lgaro|avan[çc]o/i, ["Quadríceps", "Glúteos"]],
-  [/extensor|extensora/i, ["Quadríceps"]],
-  [/supino|crucifixo(?! inverso)|peck|voador(?! inverso)|paralela|flex[ãa]o livre|flex[ãa]o de bra[çc]o|cross ?over/i, ["Peito"]],
-  [/puxada|remada|pulldown|pull.?down|barra fixa|pull.?over|extens[ãa]o de ombro/i, ["Costas"]],
+  [/crucifixo inverso|voador inverso|face ?pull|deltoide posterior/i, ["Ombro post."], []],
+  [/eleva[çc][ãa]o lateral/i, ["Ombro lat."], []],
+  [/eleva[çc][ãa]o frontal/i, ["Ombro ant."], []],
+  [/desenvolvimento/i, ["Ombro ant."], ["Ombro lat.", "Tríceps"]],
+  [/encolhimento/i, ["Trapézio"], []],
+  [/tr[ií]ceps/i, ["Tríceps"], []],
+  [/antebra[çc]o|rosca (de )?punho/i, ["Antebraço"], []],
+  [/b[ií]ceps|rosca(?! (de )?punho)/i, ["Bíceps"], []],
+  [/panturrilha|s[óo]leo|g[êe]meos/i, ["Panturrilha"], []],
+  [/abdominal|abominal|prancha|roller|obl[ií]quo|crunch/i, ["Abdômen"], []],
+  [/stiff|terra romeno|good morning/i, ["Posteriores"], ["Glúteos", "Lombar"]],
+  [/flexora|flexor|n[óo]rdica|flex[ãa]o de joelho/i, ["Posteriores"], []],
+  [/extens[ãa]o de quadril|gl[úu]teo|eleva[çc][ãa]o p[ée]lvica|abdu[çc][ãa]o/i, ["Glúteos"], []],
+  [/extens[ãa]o de tronco|lombar|hiperextens/i, ["Lombar"], ["Glúteos"]],
+  [/agachamento|leg.?press|hack|passada|afundo|a fundo|b[úu]lgaro|avan[çc]o/i, ["Quadríceps"], ["Glúteos"]],
+  [/extensor|extensora/i, ["Quadríceps"], []],
+  [/supino|paralela|flex[ãa]o livre|flex[ãa]o de bra[çc]o/i, ["Peito"], ["Tríceps", "Ombro ant."]],
+  [/crucifixo(?! inverso)|peck|voador(?! inverso)|cross ?over/i, ["Peito"], ["Ombro ant."]],
+  [/puxada|remada|pulldown|pull.?down|barra fixa/i, ["Costas"], ["Bíceps", "Ombro post."]],
+  [/pull.?over|extens[ãa]o de ombro/i, ["Costas"], []],
 ];
 function partes(nome) {
   return String(nome).split(/\s+\+\s+/).reduce((acc, p) => {
@@ -408,17 +460,31 @@ function partes(nome) {
     return acc;
   }, []);
 }
-function gruposDe(texto) {
-  const out = [];
-  for (const [re, gs] of REGRAS) if (re.test(texto)) gs.forEach((g) => out.includes(g) || out.push(g));
+// Pesos por grupo de um trecho do nome: 1 = direto, config.indireta = indireto (um direto sempre prevalece).
+function pesosDe(texto) {
+  const out = {};
+  for (const [re, dir, ind] of REGRAS) if (re.test(texto)) {
+    dir.forEach((g) => (out[g] = 1));
+    ind.forEach((g) => { if (!(g in out)) out[g] = -1; });
+  }
+  for (const g in out) if (out[g] === -1) out[g] = config.indireta;
+  for (const g in out) if (!out[g]) delete out[g];
   return out;
 }
+// Grupos de um exercício com o peso de cada um, somando as partes de exercícios combinados.
+function pesosExercicio(e) {
+  if (e.grupos && e.grupos.length) return Object.fromEntries(e.grupos.map((g) => [g, 1]));
+  const out = {};
+  partes(e.nome).forEach((p) => { for (const [g, w] of Object.entries(pesosDe(p))) out[g] = (out[g] || 0) + w; });
+  return out;
+}
+// Grupos diretos (para os botões da edição).
 function gruposExercicio(e) {
   if (e.grupos && e.grupos.length) return e.grupos;
-  const out = [];
-  partes(e.nome).forEach((p) => gruposDe(p).forEach((g) => out.includes(g) || out.push(g)));
-  return out;
+  const p = pesosExercicio(e);
+  return GRUPOS.filter((g) => p[g] >= 1);
 }
+const fracao = (w) => w === 0.5 ? "½" : num(w, 2);
 
 /* ---------- Séries, repetições e cargas ---------- */
 
@@ -462,13 +528,12 @@ function statsExercicio(e) {
     prev.push(p);
   }
   const grupos = {};
-  if (e.grupos && e.grupos.length) e.grupos.forEach((g) => (grupos[g] = (grupos[g] || 0) + sets));
-  else partes(e.nome).forEach((pt) => gruposDe(pt).forEach((g) => (grupos[g] = (grupos[g] || 0) + sets)));
+  for (const [g, w] of Object.entries(pesosExercicio(e))) grupos[g] = sets * w;
   return { sets, ton: Math.round(ton), grupos };
 }
 
 function zona(g, v) {
-  const r = REF[g];
+  const r = R()[g];
   if (!r) return { k: "none", t: "Sem referência", c: "var(--line)" };
   const [mv, mev, lo, hi, mrv] = r;
   if (v > mrv) return { k: "over", t: "Acima do MRV", c: "var(--z-over)" };
@@ -482,7 +547,7 @@ const ZONAS = [
   ["var(--z-low)", "Abaixo da manutenção"], ["var(--z-mv)", "Manutenção (MV a MEV)"], ["var(--z-mev)", "MEV a MAV"],
   ["var(--z-mav)", "Faixa MAV"], ["var(--z-high)", "MAV a MRV"], ["var(--z-over)", "Acima do MRV"],
 ];
-const refTexto = (g) => { const r = REF[g]; return r ? `MV ${r[0]} · MEV ${r[1]} · MAV ${r[2]}–${r[3]} · MRV ${r[4]}` : "Sem referência de Israetel"; };
+const refTexto = (g) => { const r = R()[g]; return r ? `MV ${r[0]} · MEV ${r[1]} · MAV ${r[2]}–${r[3]} · MRV ${r[4]}` : "Sem referência"; };
 
 /* ---------- Datas ---------- */
 
@@ -582,7 +647,8 @@ const LS = {
 async function carregar() {
   if (db) {
     try {
-      const [atual, arq, lg] = await Promise.all([db.doc("ficha/atual").get(), db.collection("arquivo").get(), db.collection("log").get()]);
+      const [atual, arq, lg, cfg] = await Promise.all([db.doc("ficha/atual").get(), db.collection("arquivo").get(), db.collection("log").get(), db.doc("config/ajustes").get()]);
+      if (cfg.exists) config = { ...config, ...cfg.data() };
       state.ficha = atual.exists ? atual.data() : null;
       state.arquivo = arq.docs.map((d) => ({ id: d.id, ...d.data() }));
       state.log = lg.docs.map((d) => ({ ...d.data(), id: d.id }));
@@ -593,6 +659,7 @@ async function carregar() {
     state.ficha = LS.get("ficha", null);
     state.arquivo = LS.get("arquivo", []);
     state.log = LS.get("log", []);
+    config = { ...config, ...LS.get("config", {}) };
   }
   state.arquivo.sort((a, b) => String(b.arquivadaEm).localeCompare(String(a.arquivadaEm)));
   ordenarLog();
@@ -626,6 +693,11 @@ async function salvarNovaFicha(nova) {
 async function salvarFichaAtual() {
   if (db) await db.doc("ficha/atual").set(state.ficha);
   else LS.set("ficha", state.ficha);
+}
+
+async function salvarConfig() {
+  if (db) await db.doc("config/ajustes").set(config);
+  else LS.set("config", config);
 }
 
 async function gravarLog(entry) {
@@ -748,7 +820,8 @@ function renderExercicio(t, e, j) {
         <button class="btn ghost" data-cancelar>Cancelar</button>
         <button class="btn" data-salvar>Salvar</button></div>`;
   } else {
-    const gs = gruposExercicio(e);
+    const ps = pesosExercicio(e);
+    const gs = GRUPOS.filter((g) => ps[g]).sort((a, b) => ps[b] - ps[a]).map((g) => ps[g] === 1 ? g : g + " " + fracao(ps[g]));
     const meta = [gs.length ? gs.join(" · ") : "Sem grupo muscular: toque em Editar", e.editadoEm ? "alterado em " + fmtData(e.editadoEm) : ""].filter(Boolean).join(" · ");
     corpo = `${e.series.length ? `<ul class="series">${e.series.map((s) => `<li>${serieHtml(s)}</li>`).join("")}</ul>` : ""}
       <div class="meta-line">${esc(meta)}</div>`;
@@ -774,7 +847,7 @@ function totaisDe(itens) {
   }
   return { sets, ton, grupos };
 }
-const gruposHtml = (grupos) => `<div class="gl">${GRUPOS.filter((g) => grupos[g]).map((g) => `<span>${esc(g)} ${num(grupos[g].sets ?? grupos[g])}</span>`).join("")}</div>`;
+const gruposHtml = (grupos) => `<div class="gl">${GRUPOS.filter((g) => grupos[g]).map((g) => `<span>${esc(g)} ${num(grupos[g].sets ?? grupos[g], 1)}</span>`).join("")}</div>`;
 
 function renderCheckin(t) {
   const hoje = hojeISO();
@@ -867,7 +940,7 @@ function porSemana(L) {
 }
 
 function bulletRow(g, v) {
-  const r = REF[g], z = zona(g, v);
+  const r = R()[g], z = zona(g, v);
   const max = Math.max(r[4] * 1.15, v * 1.05, 1);
   const cortes = [0, r[0], r[1], r[2], r[3], r[4], max];
   const bands = ZONAS.map(([c], i) => {
@@ -875,9 +948,9 @@ function bulletRow(g, v) {
     return w > 0 ? `<span class="band" style="--zc:${c};width:calc(${w}% - 2px)"></span>` : "";
   }).join("");
   const pos = Math.min(v / max * 100, 100);
-  return `<li title="${esc(g)}: ${num(v)} séries · ${esc(refTexto(g))}">
-    <div class="bl-head"><b>${esc(g)}</b><span class="v"><strong>${num(v)}</strong> séries · <span class="zt" style="--zc:${z.c}"><i></i>${esc(z.t)}</span></span></div>
-    <div class="track" role="img" aria-label="${esc(g)}: ${num(v)} séries por semana, ${esc(z.t)}. ${esc(refTexto(g))}">${bands}
+  return `<li title="${esc(g)}: ${num(v, 1)} séries · ${esc(refTexto(g))}">
+    <div class="bl-head"><b>${esc(g)}</b><span class="v"><strong>${num(v, 1)}</strong> séries · <span class="zt" style="--zc:${z.c}"><i></i>${esc(z.t)}</span></span></div>
+    <div class="track" role="img" aria-label="${esc(g)}: ${num(v, 1)} séries por semana, ${esc(z.t)}. ${esc(refTexto(g))}">${bands}
       ${v > 0 ? `<span class="bar" style="width:${pos}%"></span>` : ""}<span class="tick" style="left:calc(${pos}% - 1px)"></span></div></li>`;
 }
 
@@ -903,7 +976,7 @@ function renderAnalises() {
     </div></div>`;
 
   if (!state.log.length) {
-    return h + `<div class="empty"><strong>Nenhum check-in ainda</strong>Faça o check-in no fim de cada treino, na página Treino. As séries e a tonelagem de cada dia aparecem aqui, com as referências de volume de Israetel.</div></section>`;
+    return h + `<div class="empty"><strong>Nenhum check-in ainda</strong>Faça o check-in no fim de cada treino, na página Treino. As séries e a tonelagem de cada dia aparecem aqui, com as referências de volume do perfil escolhido em Ajustes.</div></section>`;
   }
 
   // Semana selecionada
@@ -916,16 +989,16 @@ function renderAnalises() {
     </div></div>`;
 
   // Volume × referências
-  h += `<div class="card"><h2>Volume semanal × referências<small>Séries por grupo muscular na semana, sobre as faixas de Israetel. O traço preto é o seu volume.</small></h2>
-    <ul class="bullets">${GRUPOS.filter((g) => REF[g]).map((g) => bulletRow(g, (w.grupos[g] || {}).sets || 0)).join("")}</ul>
+  h += `<div class="card"><h2>Volume semanal × referências<small>Séries por grupo muscular na semana, sobre as faixas do perfil ${esc(PERFIS[config.perfil])}. Séries indiretas contam ${config.indireta === 0.5 ? "meia série" : config.indireta ? "uma série" : "zero"}. O traço preto é o seu volume.</small></h2>
+    <ul class="bullets">${GRUPOS.filter((g) => R()[g]).map((g) => bulletRow(g, (w.grupos[g] || {}).sets || 0)).join("")}</ul>
     <div class="legend">${ZONAS.map(([c, t]) => `<span class="zt" style="--zc:${c}"><i></i>${t}</span>`).join("")}</div></div>`;
 
   // Tabela da semana
-  const linhas = GRUPOS.filter((g) => REF[g] || w.grupos[g]);
+  const linhas = GRUPOS.filter((g) => R()[g] || w.grupos[g]);
   h += `<div class="card"><h2>Séries e tonelagem por grupo<small>Semana de ${dm(f.semana)} a ${dm(ultima)}. Em exercícios combinados, a tonelagem é dividida entre os grupos.</small></h2>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Grupo</th><th class="n">Séries</th><th class="n">Tonelagem</th><th>Zona</th><th class="n">MV</th><th class="n">MEV</th><th class="n">MAV</th><th class="n">MRV</th></tr></thead><tbody>
-    ${linhas.map((g) => { const v = w.grupos[g] || { sets: 0, ton: 0 }, z = zona(g, v.sets), r = REF[g];
-      return `<tr><td>${esc(g)}</td><td class="n">${num(v.sets)}</td><td class="n">${num(v.ton)} kg</td><td><span class="zt" style="--zc:${z.c}"><i></i>${esc(z.t)}</span></td>
+    ${linhas.map((g) => { const v = w.grupos[g] || { sets: 0, ton: 0 }, z = zona(g, v.sets), r = R()[g];
+      return `<tr><td>${esc(g)}</td><td class="n">${num(v.sets, 1)}</td><td class="n">${num(v.ton)} kg</td><td><span class="zt" style="--zc:${z.c}"><i></i>${esc(z.t)}</span></td>
         <td class="n">${r ? r[0] : "—"}</td><td class="n">${r ? r[1] : "—"}</td><td class="n">${r ? r[2] + "–" + r[3] : "—"}</td><td class="n">${r ? r[4] : "—"}</td></tr>`; }).join("")}
     </tbody></table></div></div>`;
 
@@ -943,11 +1016,11 @@ function renderAnalises() {
 
   // Séries por semana e grupo (últimas 8 semanas)
   const s8 = semanas.slice(-8);
-  h += `<div class="card"><h2>Séries por semana e grupo<small>A cor da célula mostra a zona de Israetel daquela semana.</small></h2>
+  h += `<div class="card"><h2>Séries por semana e grupo<small>A cor da célula mostra a zona daquela semana no perfil ${esc(PERFIS[config.perfil])}.</small></h2>
     <div class="tbl-wrap"><table class="tbl heat"><thead><tr><th>Grupo</th>${s8.map((s) => `<th class="n">${dm(s)}</th>`).join("")}</tr></thead><tbody>
-    ${GRUPOS.filter((g) => REF[g] || s8.some((s) => sem[s] && sem[s].grupos[g])).map((g) => `<tr><td>${esc(g)}</td>${s8.map((s) => {
+    ${GRUPOS.filter((g) => R()[g] || s8.some((s) => sem[s] && sem[s].grupos[g])).map((g) => `<tr><td>${esc(g)}</td>${s8.map((s) => {
       const v = ((sem[s] || { grupos: {} }).grupos[g] || {}).sets || 0, z = zona(g, v);
-      return `<td class="cell${v ? "" : " zero"}" style="--zc:${v ? z.c : "transparent"}" title="${esc(g)} · semana ${dm(s)}: ${num(v)} séries (${esc(z.t)})">${num(v)}</td>`; }).join("")}</tr>`).join("")}
+      return `<td class="cell${v ? "" : " zero"}" style="--zc:${v ? z.c : "transparent"}" title="${esc(g)} · semana ${dm(s)}: ${num(v, 1)} séries (${esc(z.t)})">${num(v, 1)}</td>`; }).join("")}</tr>`).join("")}
     </tbody></table></div>
     <div class="legend">${ZONAS.map(([c, t]) => `<span class="zt" style="--zc:${c}"><i></i>${t}</span>`).join("")}</div></div>`;
 
@@ -956,11 +1029,11 @@ function renderAnalises() {
     ${L.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Dia</th><th>Treino</th><th class="n">Séries</th><th class="n">Tonelagem</th><th>Séries por grupo</th><th></th></tr></thead><tbody>
     ${L.map((l) => `<tr><td style="white-space:nowrap">${esc(fmtDia(l.data))}</td><td>T${l.treino}${l.treinoNome ? " · " + esc(l.treinoNome) : ""}<br><span class="meta-line">${esc(l.fichaTitulo || "")}</span></td>
       <td class="n">${num(l.sets)}</td><td class="n">${num(l.ton)} kg</td>
-      <td>${GRUPOS.filter((g) => l.grupos[g]).map((g) => esc(g) + " " + num(l.grupos[g].sets)).join(" · ")}</td>
+      <td>${GRUPOS.filter((g) => l.grupos[g]).map((g) => esc(g) + " " + num(l.grupos[g].sets, 1)).join(" · ")}</td>
       <td><button class="del${apagar === l.id ? " confirm" : ""}" data-apagar="${esc(l.id)}">${apagar === l.id ? "Confirmar" : "Apagar"}</button></td></tr>`).join("")}
     </tbody></table></div>` : `<p>Nenhum check-in com estes filtros.</p>`}</div>`;
 
-  h += `<p class="src">Referências gerais de volume semanal da Renaissance Periodization (Dr. Mike Israetel), para quem treina há algum tempo; ajuste conforme sua recuperação. MV: manutenção · MEV: volume mínimo efetivo · MAV: volume máximo adaptável · MRV: volume máximo recuperável. Leia mais: <a href="https://www.treinoai.com.br/academy/blog/volume-de-treino-o-guia-definitivo" target="_blank" rel="noopener">TreinoAI</a> · <a href="https://www.hipertrofia.org/blog/2020/11/24/volume-de-treino-para-hipertrofia/" target="_blank" rel="noopener">Hipertrofia.org</a>.</p>`;
+  h += `<p class="src">Perfil: <b>${esc(PERFIS[config.perfil])}</b> (troque em <a href="#ajustes">Ajustes</a>). MV: manutenção · MEV: volume mínimo efetivo · MAV: volume máximo adaptável · MRV: volume máximo recuperável. Os check-ins guardam as séries calculadas no dia do registro.</p>`;
   return h + `</section>`;
 }
 
@@ -984,6 +1057,21 @@ function renderAjustes() {
     </div>
     <p>No app Notas, abra a ficha, toque em Compartilhar › Imprimir › Salvar PDF (ou Exportar como PDF) e envie aqui.</p>
     ${db ? "" : `<p>A ficha, o arquivo e o log ficam salvos neste iPhone. Baixe o PDF das fichas anteriores para guardar uma cópia.</p>`}</div>`;
+  const rf = R();
+  const fontes = config.perfil === "personalizado" ? [...FONTES.avancado, ...FONTES.israetel] : FONTES[config.perfil];
+  h += `<div class="card"><h2>Referências de volume<small>Séries por grupo muscular por semana, usadas nas faixas do painel de análises.</small></h2>
+    <div class="filters">
+      <label class="field"><span>Perfil</span><select class="txt" id="cfg-perfil">${Object.entries(PERFIS).map(([k, t]) => `<option value="${k}"${config.perfil === k ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label class="field"><span>Séries indiretas</span><select class="txt" id="cfg-ind">
+        <option value="0.5"${config.indireta === 0.5 ? " selected" : ""}>Contam ½ série (Pelland et al.)</option>
+        <option value="1"${config.indireta === 1 ? " selected" : ""}>Contam 1 série</option>
+        <option value="0"${config.indireta === 0 ? " selected" : ""}>Não contam</option></select></label>
+    </div>
+    <p>${config.perfil === "avancado" ? "Síntese de estudos com pessoas treinadas há mais de um ano. Quadríceps, bíceps e tríceps têm dados diretos; os demais grupos foram extrapolados na mesma proporção." : config.perfil === "israetel" ? "Valores gerais da Renaissance Periodization, pensados para quem treina há algum tempo." : "Seus valores. Mudar o perfil acima não apaga esta tabela."} Mudar qualquer número cria o perfil Personalizado.</p>
+    <div class="tbl-wrap"><table class="tbl refs"><thead><tr><th>Grupo</th><th class="n">MV</th><th class="n">MEV</th><th class="n">MAV mín.</th><th class="n">MAV máx.</th><th class="n">MRV</th></tr></thead><tbody>
+    ${GRUPOS.filter((g) => rf[g]).map((g) => `<tr><td>${esc(g)}</td>${rf[g].map((v, i) => `<td class="n"><input class="txt numin" type="number" inputmode="numeric" min="0" max="80" id="ref-${GRUPOS.indexOf(g)}-${i}" data-ref="${esc(g)}|${i}" value="${v}" aria-label="${esc(g)} ${["MV", "MEV", "MAV mínimo", "MAV máximo", "MRV"][i]}"></td>`).join("")}</tr>`).join("")}
+    </tbody></table></div>
+    <details><summary>Fontes (${fontes.length})</summary><ul class="fontes">${fontes.map(([t, u]) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join("")}</ul></details></div>`;
   h += `<div class="card"><h2>Timer do iPhone</h2>
     <label class="opt"><input type="checkbox" id="opt-atalho" data-opt="atalho"${opts.atalho ? " checked" : ""}>
       <span>Usar o atalho “Descanso”<small>Os botões 1:00, 1:30 e 2:00 abrem o app Atalhos e iniciam o timer do Relógio, que toca mesmo com a tela bloqueada. O timer da tela continua contando junto.</small></span></label>
@@ -1155,6 +1243,22 @@ document.addEventListener("change", async (ev) => {
   if (t.id === "ck-data" && checkin) { checkin.data = t.value || hojeISO(); return; }
   if (t.id === "f-ficha") { state.filtro.ficha = t.value; state.filtro.semana = null; render(); return; }
   if (t.id === "f-treino") { state.filtro.treino = t.value; state.filtro.semana = null; render(); return; }
+  if (t.id === "cfg-perfil" || t.id === "cfg-ind" || (t.dataset && t.dataset.ref)) {
+    if (t.id === "cfg-perfil") {
+      if (t.value === "personalizado" && !config.custom) config.custom = JSON.parse(JSON.stringify(R()));
+      config.perfil = t.value;
+    } else if (t.id === "cfg-ind") {
+      config.indireta = +t.value;
+    } else {
+      const [g, i] = t.dataset.ref.split("|");
+      const v = Math.max(0, Math.round(+t.value || 0));
+      if (config.perfil !== "personalizado") { config.custom = JSON.parse(JSON.stringify(R())); config.perfil = "personalizado"; }
+      config.custom[g][+i] = v;
+    }
+    try { await salvarConfig(); toast("Referências salvas."); }
+    catch (err) { toast("Não consegui salvar (" + (err.code || err.message) + ")."); }
+    render(); return;
+  }
   if (t.dataset && t.dataset.opt) { opts[t.dataset.opt] = t.checked; LS.set("opts", opts); atualizarLinks(); render(); return; }
   if (t.id !== "pdfin") return;
   const file = t.files && t.files[0];
