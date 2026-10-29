@@ -402,6 +402,7 @@ let renomear = null;   // número do treino sendo renomeado
 let checkin = null;    // { n, data, sel: [bool] } enquanto o check-in está aberto
 let apagar = null;     // id do registro do log aguardando confirmação para apagar
 let novo = null;       // exercício sendo adicionado: { n, nome, series, escolhas }
+let novaFicha = null;  // ficha sendo criada no app: { titulo, dias, base, nomes }
 const abertos = new Set(); // exercícios com as imagens de execução abertas
 
 /* ---------- Grupos musculares e referências de volume (séries por semana) ---------- */
@@ -1266,12 +1267,14 @@ function renderNovo() {
 
 function renderTreino() {
   if (!state.ficha) {
-    return `<section class="panel"><div class="empty"><strong>Nenhuma ficha carregada</strong>Abra <a href="#ajustes">Ajustes</a> e envie o PDF da sua nota de treino. O app separa os treinos 1 a 6 de segunda a sábado.</div></section>`;
+    return `<section class="panel"><div class="empty"><strong>Nenhuma ficha ainda</strong>Crie a ficha aqui no app ou envie o PDF da sua nota de treino em <a href="#ajustes">Ajustes</a>. Os treinos 1 a 6 ficam de segunda a sábado.</div>
+      <button class="btn" data-novaficha>Criar ficha no app</button></section>`;
   }
   const i = state.tab;
   const t = state.ficha.treinos.find((x) => x.n === i + 1);
   let h = renderDays();
-  if (!t) return h + `<div class="dayhead"><h2>${DIAS[i]}</h2></div><div class="empty"><strong>Sem treino</strong>A ficha atual não tem o Treino ${i + 1}.</div>`;
+  if (!t) return h + `<div class="dayhead"><h2>${DIAS[i]}</h2></div><div class="empty"><strong>Sem treino</strong>A ficha atual não tem o Treino ${i + 1}.</div>
+    <button class="btn ghost add-ex" data-criartreino="${i + 1}">+ Criar o Treino ${i + 1} para ${DIAS[i].toLowerCase()}</button>`;
   const nFeitos = t.exercicios.filter((_, j) => feitos.itens[`${state.ficha.carregadaEm}|${t.n}|${j}`]).length;
   if (renomear === t.n) {
     h += `<div class="dayhead"><div class="rename">
@@ -1430,6 +1433,38 @@ function renderAnalises() {
 
 /* ---------- Página: Ajustes ---------- */
 
+function renderNovaFicha() {
+  const nf = novaFicha, f = state.ficha;
+  return `<div class="card novo" id="card-nova"><h2>Nova ficha<small>Monte a ficha aqui mesmo. Depois de criar, você adiciona os exercícios de cada dia na página Treino.</small></h2>
+    <label class="field"><span>Nome da ficha</span><input class="txt" id="nf-titulo" value="${esc(nf.titulo)}" autocomplete="off"></label>
+    <label class="field"><span>Quantos treinos</span><select class="txt" id="nf-dias">${[1, 2, 3, 4, 5, 6].map((n) =>
+      `<option value="${n}"${nf.dias === n ? " selected" : ""}>${n} ${n === 1 ? "treino" : "treinos"} · ${n === 1 ? "segunda" : "segunda a " + DIAS[n - 1].toLowerCase()}</option>`).join("")}</select></label>
+    <div class="field"><span>Nome de cada treino (opcional)</span>
+      <ul class="ed-list">${Array.from({ length: nf.dias }, (_, i) => `<li><input class="txt" id="nf-nome-${i}" data-nfnome="${i}" value="${esc(nf.nomes[i] || "")}" autocomplete="off" placeholder="${DIAS[i]} · Treino ${i + 1}" aria-label="Nome do Treino ${i + 1}"></li>`).join("")}</ul></div>
+    <div class="field"><span>Começar</span>
+      <label class="opt"><input type="radio" name="nf-base" id="nf-base-vazia" value="vazia"${nf.base === "vazia" ? " checked" : ""}><span>Em branco<small>Os treinos começam sem exercícios.</small></span></label>
+      ${f ? `<label class="opt"><input type="radio" name="nf-base" id="nf-base-atual" value="atual"${nf.base === "atual" ? " checked" : ""}><span>Copiando a ficha atual<small>Traz exercícios, séries e cargas de “${esc(f.titulo)}” para você alterar.</small></span></label>` : ""}
+    </div>
+    ${f ? `<p>A ficha atual (${esc(f.titulo)}) vai para Treinos anteriores. Os check-ins já feitos continuam no log.</p>` : ""}
+    <div class="row"><button class="btn ghost" data-nfcancelar>Cancelar</button><button class="btn" data-nfcriar>Criar ficha</button></div></div>`;
+}
+// Guarda o que já foi digitado no formulário antes de redesenhar a página.
+function lerNovaFicha() {
+  if (!novaFicha) return;
+  const t = $("nf-titulo"); if (t) novaFicha.titulo = t.value;
+  document.querySelectorAll("[data-nfnome]").forEach((i) => (novaFicha.nomes[+i.dataset.nfnome] = i.value));
+  const b = document.querySelector('input[name="nf-base"]:checked'); if (b) novaFicha.base = b.value;
+}
+function abrirNovaFicha() {
+  const f = state.ficha;
+  novaFicha = { titulo: "Treino de " + fmtData(new Date().toISOString()), dias: f ? Math.min(6, Math.max(1, f.treinos.length)) : 6, base: "vazia", nomes: f ? f.treinos.map((t) => t.nome || "") : [] };
+  state.page = "ajustes"; state.pendente = null; state.msg = null;
+  if (location.hash !== "#ajustes") history.replaceState(null, "", "#ajustes");
+  render();
+  $("card-nova")?.scrollIntoView({ block: "start" });
+  $("nf-titulo")?.select();
+}
+
 function renderAjustes() {
   const f = state.ficha, p = state.pendente;
   let h = `<section class="panel">`;
@@ -1441,11 +1476,13 @@ function renderAjustes() {
       ${f ? `<p>A ficha atual (${esc(f.titulo)}) vai para Treinos anteriores. Os check-ins já feitos continuam no log.</p>` : ""}
       <div class="row"><button class="btn" id="confirmar">Usar esta ficha</button><button class="btn ghost" id="cancelar">Cancelar</button></div></div>`;
   }
+  if (novaFicha) h += renderNovaFicha();
   h += `<div class="card"><h2>Ficha atual</h2>
     ${f ? `<label class="field"><span>Nome da ficha</span><div class="row"><input class="txt" id="titulo-ficha" value="${esc(f.titulo)}" autocomplete="off" style="flex:1 1 200px"><button class="btn ghost" data-salvartitulo style="flex:0 0 auto">Salvar</button></div></label>
       <p>Carregada em ${fmtData(f.carregadaEm)} · ${f.treinos.length} treinos</p>` : `<p>Nenhuma ficha carregada ainda.</p>`}
     <div class="row">
-      <label class="btn" for="pdfin">Enviar novo PDF<input type="file" id="pdfin" accept="application/pdf,.pdf"></label>
+      <button class="btn" data-novaficha>Criar ficha no app</button>
+      <label class="btn ghost" for="pdfin">Enviar novo PDF<input type="file" id="pdfin" accept="application/pdf,.pdf"></label>
     </div>
     <p>No app Notas, abra a ficha, toque em Compartilhar › Imprimir › Salvar PDF (ou Exportar como PDF) e envie aqui.</p>
     ${db ? "" : `<p>A ficha, o arquivo e o log ficam salvos neste iPhone. Baixe o PDF das fichas anteriores para guardar uma cópia.</p>`}</div>`;
@@ -1514,6 +1551,7 @@ function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false
 function irPara(page) {
   state.page = PAGINAS.includes(page) ? page : "treino";
   edicao = null; renomear = null; apagar = null; state.msg = state.page === "ajustes" ? state.msg : null;
+  if (state.page !== "ajustes") novaFicha = null;
   render(); window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", () => irPara(location.hash.slice(1)));
@@ -1697,6 +1735,38 @@ document.addEventListener("click", async (ev) => {
   }
 
   // Ficha nova
+  if (el("[data-novaficha]")) { abrirNovaFicha(); return; }
+  if (el("[data-nfcancelar]")) { novaFicha = null; render(); return; }
+  if ((b = el("[data-nfcriar]"))) {
+    lerNovaFicha();
+    const titulo = novaFicha.titulo.replace(/\s+/g, " ").trim();
+    if (!titulo) { toast("Dê um nome para a ficha."); $("nf-titulo")?.focus(); return; }
+    const base = novaFicha.base === "atual" && state.ficha ? JSON.parse(JSON.stringify(state.ficha.treinos)) : [];
+    const treinos = Array.from({ length: novaFicha.dias }, (_, i) => {
+      const t = base.find((x) => x.n === i + 1) || { n: i + 1, exercicios: [] };
+      const nome = (novaFicha.nomes[i] || "").replace(/\s+/g, " ").trim();
+      if (nome) t.nome = nome; else delete t.nome;
+      return t;
+    });
+    const f = { titulo, treinos, origem: "criada no app" };
+    if (state.ficha && state.ficha.fonteCat) f.fonteCat = state.ficha.fonteCat;
+    b.disabled = true;
+    try {
+      await salvarNovaFicha(f);
+      novaFicha = null; state.tab = 0; edicao = null; novo = null;
+      location.hash = "treino"; irPara("treino");
+      toast(base.length ? "Ficha criada a partir da anterior. Ajuste o que quiser." : "Ficha criada. Toque em “+ Adicionar exercício” em cada dia.");
+    } catch (err) { b.disabled = false; toast("Não consegui criar a ficha (" + (err.code || err.message) + ")."); }
+    return;
+  }
+  if ((b = el("[data-criartreino]"))) {
+    const n = +b.dataset.criartreino;
+    state.ficha.treinos.push({ n, exercicios: [] });
+    state.ficha.treinos.sort((a, c) => a.n - c.n);
+    try { await salvarFichaAtual(); render(); toast("Treino " + n + " criado."); }
+    catch (err) { state.ficha.treinos = state.ficha.treinos.filter((x) => x.n !== n || x.exercicios.length); toast("Não consegui salvar (" + (err.code || err.message) + ")."); }
+    return;
+  }
   if (ev.target.id === "cancelar") { state.pendente = null; render(); return; }
   if (ev.target.id === "confirmar") {
     ev.target.disabled = true;
@@ -1740,6 +1810,8 @@ document.addEventListener("change", async (ev) => {
     try { await salvarFichaAtual(); toast("Exercício definido."); } catch (err) { toast("Não consegui salvar (" + (err.code || err.message) + ")."); }
     render(); return;
   }
+  if (t.id === "nf-dias" && novaFicha) { lerNovaFicha(); novaFicha.dias = +t.value; render(); return; }
+  if (t.name === "nf-base" && novaFicha) { novaFicha.base = t.value; return; }
   if (t.id === "ck-data" && checkin) { checkin.data = t.value || hojeISO(); return; }
   if (t.id === "f-ficha") { state.filtro.ficha = t.value; state.filtro.semana = null; render(); return; }
   if (t.id === "f-treino") { state.filtro.treino = t.value; state.filtro.semana = null; render(); return; }
