@@ -9,6 +9,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+
 </head>
 <body>
 <title>Treino do Eduardo</title>
@@ -72,6 +73,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, a:focus-visible, label:focus-within, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 header.top { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.selo { align-self: flex-start; background: var(--z-high); color: #fff; border-radius: 6px; padding: 2px 8px; font-family: var(--display); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
 .eyebrow { font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; color: var(--muted); }
 h1 { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; }
 
@@ -308,6 +310,7 @@ ul.fontes a { color: var(--accent); }
 
 <div class="wrap">
   <header class="top">
+    <div class="selo" id="selo" hidden>Versão de teste</div>
     <div class="eyebrow" id="sub">Ficha de treino</div>
     <h1 id="titulo">Treino do Eduardo</h1>
   </header>
@@ -639,10 +642,19 @@ window.importPdfBuffer = importPdfBuffer; // usado em testes
 
 /* ---------- Armazenamento ---------- */
 
+// A versão de teste (pasta /teste/ no GitHub) guarda tudo com o prefixo "teste:", sem tocar nos dados da versão principal.
+const TESTE = !!window.TREINO_TESTE;
+const PFX = TESTE ? "teste:" : "";
 const LS = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  get(k, d) { try { const v = localStorage.getItem(PFX + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(PFX + k, JSON.stringify(v)); } catch {} },
 };
+// Copia ficha, arquivo, log e ajustes da versão principal para a de teste.
+function copiarDaPrincipal() {
+  for (const k of ["ficha", "arquivo", "log", "config", "opts"]) {
+    try { const v = localStorage.getItem(k); if (v != null) localStorage.setItem(PFX + k, v); else localStorage.removeItem(PFX + k); } catch {}
+  }
+}
 
 async function carregar() {
   if (db) {
@@ -1057,6 +1069,10 @@ function renderAjustes() {
     </div>
     <p>No app Notas, abra a ficha, toque em Compartilhar › Imprimir › Salvar PDF (ou Exportar como PDF) e envie aqui.</p>
     ${db ? "" : `<p>A ficha, o arquivo e o log ficam salvos neste iPhone. Baixe o PDF das fichas anteriores para guardar uma cópia.</p>`}</div>`;
+  if (TESTE) h += `<div class="card"><h2>Versão de teste<small>Os dados desta versão são separados dos da versão principal. O que você faz aqui não muda a principal.</small></h2>
+    ${state.copiar ? `<p>Isso substitui a ficha, o arquivo, o log e os ajustes desta versão de teste pelos da principal.</p>
+      <div class="row"><button class="btn ghost" data-copiar="nao">Cancelar</button><button class="btn" data-copiar="sim">Copiar agora</button></div>`
+    : `<button class="btn ghost" data-copiar="pedir">Copiar dados da versão principal</button>`}</div>`;
   const rf = R();
   const fontes = config.perfil === "personalizado" ? [...FONTES.avancado, ...FONTES.israetel] : FONTES[config.perfil];
   h += `<div class="card"><h2>Referências de volume<small>Séries por grupo muscular por semana, usadas nas faixas do painel de análises.</small></h2>
@@ -1084,6 +1100,7 @@ function renderAjustes() {
 /* ---------- Render ---------- */
 
 function render() {
+  if (TESTE) $("selo").hidden = false;
   if (state.ficha) { $("titulo").textContent = state.ficha.titulo; $("sub").textContent = "Ficha de " + fmtData(state.ficha.carregadaEm); }
   document.querySelectorAll("nav.menu a").forEach((a) => { if (a.dataset.page === state.page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   $("dock").hidden = state.page !== "treino" && !timer;
@@ -1196,6 +1213,14 @@ document.addEventListener("click", async (ev) => {
     try { await apagarLog(b.dataset.desfazer); render(); toast("Check-in desfeito."); }
     catch (err) { toast("Não consegui desfazer (" + (err.code || err.message) + ")."); }
     return;
+  }
+
+  if ((b = el("[data-copiar]"))) {
+    const v = b.dataset.copiar;
+    if (v === "pedir") { state.copiar = true; render(); return; }
+    state.copiar = false;
+    if (v === "sim") { copiarDaPrincipal(); await carregar(); toast("Dados copiados da versão principal."); }
+    render(); return;
   }
 
   // Análises
