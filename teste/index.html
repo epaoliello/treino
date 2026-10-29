@@ -532,7 +532,7 @@ const fracao = (w) => w === 0.5 ? "½" : num(w, 2);
 // A chave fica só neste aparelho (nunca no código publicado).
 
 const EDB = "https://exercisedb.p.rapidapi.com";
-const chaveEdb = () => LS.get("edbChave", "");
+const chaveEdb = () => window.claude ? "" : LS.get("edbChave", "");
 let CAT = null, CAT_BY = {}, IDF = {};
 const catInfo = { erro: null, carregadoEm: null };
 const mesAtual = () => hojeISO().slice(0, 7);
@@ -986,6 +986,35 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem(PFX + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(PFX + k, JSON.stringify(v)); } catch {} },
 };
+// Uma única vez, a versão principal traz o que foi feito na versão de teste: ficha, fichas anteriores,
+// check-ins (somados aos da principal), ajustes e a chave do ExerciseDB. Nada é apagado da versão de teste.
+function migrarDoTeste() {
+  const ler = (k) => { try { const v = localStorage.getItem("teste:" + k); return v ? JSON.parse(v) : null; } catch { return null; } };
+  const tf = ler("ficha"), tChave = ler("edbChave");
+  if (!tf && !tChave) return false;
+  const mf = LS.get("ficha", null);
+  const arq = LS.get("arquivo", []);
+  const ja = new Set(arq.map((a) => a.carregadaEm + "|" + a.arquivadaEm));
+  for (const a of ler("arquivo") || []) if (!ja.has(a.carregadaEm + "|" + a.arquivadaEm)) arq.push(a);
+  if (tf) {
+    // A ficha da principal só vai para o arquivo se for outra ficha e ainda não estiver lá.
+    if (mf && mf.carregadaEm !== tf.carregadaEm && !arq.some((a) => a.carregadaEm === mf.carregadaEm)) arq.push({ ...mf, arquivadaEm: new Date().toISOString(), id: "f" + Date.now() });
+    LS.set("ficha", tf);
+  }
+  arq.sort((a, b) => String(b.arquivadaEm).localeCompare(String(a.arquivadaEm)));
+  LS.set("arquivo", arq);
+  const log = LS.get("log", []), ids = new Set(log.map((l) => l.id));
+  for (const l of ler("log") || []) if (!ids.has(l.id)) log.push(l);
+  LS.set("log", log);
+  for (const k of ["config", "opts"]) { const v = ler(k); if (v) LS.set(k, v); }
+  if (!LS.get("edbChave", "") && tChave) LS.set("edbChave", tChave);
+  return true;
+}
+if (!TESTE && !window.claude && !LS.get("migrouTeste", false)) {
+  try { state.migrou = migrarDoTeste(); } catch {}
+  LS.set("migrouTeste", true);
+}
+
 // Copia ficha, arquivo, log e ajustes da versão principal para a de teste.
 function copiarDaPrincipal() {
   for (const k of ["ficha", "arquivo", "log", "config", "opts"]) {
@@ -1970,6 +1999,7 @@ render();
   }
   await carregar();
   render();
+  if (state.migrou) toast("Seus dados da versão de teste foram trazidos para cá.");
   await iniciarCatalogo();
 })();
 // Carrega o catálogo (1 requisição) e, se a ficha ainda não usa o ExerciseDB, padroniza os nomes.
