@@ -197,6 +197,7 @@ section.panel { display: flex; flex-direction: column; gap: 12px; margin-top: 16
 .row .btn { flex: 1 1 140px; }
 input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .msg { font-size: 15px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); }
+.msg a { color: var(--accent); }
 .msg.err { background: color-mix(in srgb, var(--alarm) 15%, var(--surface)); }
 .opt { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; }
 .opt input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--accent); }
@@ -751,7 +752,8 @@ function classificar(base) {
   const r = buscar(base, 6);
   const s1 = r[0] ? r[0].s : 0, s2 = r[1] ? r[1].s : 0;
   if (s1 >= 0.62 && s1 - s2 >= 0.06) return { id: r[0].c.id, n: r[0].c.n, st: "ok", cands: [], ...gruposDoCatalogo(r[0].c) };
-  return { id: null, n: null, st: "duvida", cands: r.slice(0, 5).map((x) => x.c.id), candNomes: r.slice(0, 5).map((x) => x.c.n) };
+  const top = r.slice(0, 5).map((x) => x.c);
+  return { id: null, n: null, st: "duvida", cands: top.map((c) => c.id), candNomes: top.map((c) => c.n), candGp: top.map((c) => c.p), candGs: top.map((c) => c.s) };
 }
 function parteDe(texto) {
   let base = String(texto).trim(), extra = "";
@@ -1317,6 +1319,8 @@ function renderTreino() {
       <button class="mini" data-renomear="${t.n}">Renomear</button></div></div>`;
   }
   if (hojeIdx() === null && i === 0) h += `<p class="note">Hoje é domingo, dia de descanso. Mostrando o treino de segunda.</p>`;
+  if (!window.claude && !chaveEdb()) h += `<p class="msg">Sem a chave do ExerciseDB, as animações e as sugestões ficam desligadas. Coloque a chave em <a href="#ajustes">Ajustes</a>.</p>`;
+  else if (!window.claude && catInfo.erro) h += `<p class="msg err">${esc(catInfo.erro)}</p>`;
   const nDuv = t.exercicios.reduce((a, e) => a + duvidas(e), 0);
   if (nDuv) h += `<p class="msg err">${nDuv === 1 ? "1 exercício para conferir" : nDuv + " exercícios para conferir"}: escolha o nome certo no campo em vermelho.</p>`;
   h += `<ol class="exs">${t.exercicios.map((e, j) => renderExercicio(t, e, j)).join("")}</ol>`;
@@ -1613,6 +1617,8 @@ function renderAjustes() {
   return h + `</section>`;
 }
 
+window.addEventListener("unhandledrejection", (ev) => { toast("Algo deu errado: " + (ev.reason && ev.reason.message || "erro inesperado")); });
+
 /* ---------- Render ---------- */
 
 function render() {
@@ -1899,7 +1905,15 @@ document.addEventListener("change", async (ev) => {
     if (t.value === "__buscar") { abrirEdicao(n + "|" + j); return; }
     const e = state.ficha.treinos.find((x) => x.n === n).exercicios[j], p = e.partes[k];
     if (t.value === "__manter") Object.assign(p, { id: null, n: null, st: "manual", escolhido: true });
-    else Object.assign(p, { id: t.value, n: CAT_BY[t.value].n, st: "ok", escolhido: true });
+    else {
+      // Sem o catálogo carregado, usa o nome e os grupos guardados com a opção.
+      const c = CAT_BY[t.value], i = (p.cands || []).indexOf(t.value);
+      const nome = c ? c.n : (p.candNomes || [])[i];
+      if (!nome) { toast("Não encontrei esse exercício. Recarregue o app e tente de novo."); render(); return; }
+      Object.assign(p, { id: t.value, n: nome, st: "ok", escolhido: true, fonte: "edb" });
+      if (c) Object.assign(p, gruposDoCatalogo(c));
+      else if (p.candGp && p.candGp[i]) Object.assign(p, { gp: p.candGp[i], gs: (p.candGs && p.candGs[i]) || [] });
+    }
     e.nome = nomeDasPartes(e.partes);
     try { await salvarFichaAtual(); toast("Exercício definido."); } catch (err) { toast("Não consegui salvar (" + (err.code || err.message) + ")."); }
     render(); return;
