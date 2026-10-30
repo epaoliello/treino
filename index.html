@@ -175,6 +175,7 @@ ol.exs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction:
 .ed-actions .btn { min-height: 40px; padding: 8px 14px; font-size: 16px; flex: 1 1 auto; }
 
 .empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 20px; color: var(--muted); }
+.empty a { color: var(--accent); }
 .empty strong { color: var(--ink); display: block; font-family: var(--display); font-size: 20px; text-transform: uppercase; margin-bottom: 4px; }
 
 /* Cartões e botões */
@@ -1297,7 +1298,8 @@ function renderNovo() {
 function renderTreino() {
   if (!state.ficha) {
     return `<section class="panel"><div class="empty"><strong>Nenhuma ficha ainda</strong>Crie a ficha aqui no app ou envie o PDF da sua nota de treino em <a href="#ajustes">Ajustes</a>. Os treinos 1 a 6 ficam de segunda a sábado.</div>
-      <button class="btn" data-novaficha>Criar ficha no app</button></section>`;
+      <button class="btn" data-novaficha>Criar ficha no app</button>
+      <label class="btn ghost" for="bkin">Restaurar backup<input type="file" id="bkin" accept="application/json,.json"></label></section>`;
   }
   const i = state.tab;
   const t = state.ficha.treinos.find((x) => x.n === i + 1);
@@ -1462,6 +1464,56 @@ function renderAnalises() {
 
 /* ---------- Página: Ajustes ---------- */
 
+/* ---------- Backup: no iPhone, Safari e app da Tela de Início guardam dados separados ---------- */
+
+function dadosBackup() {
+  return { app: "treino", versao: 1, geradoEm: new Date().toISOString(), ficha: state.ficha, arquivo: state.arquivo, log: state.log, config, opts: { ...opts } };
+}
+async function exportarBackup() {
+  const nome = "Treino backup " + fmtData(new Date().toISOString()).replace(/\//g, "-") + ".json";
+  const file = new File([JSON.stringify(dadosBackup())], nome, { type: "application/json" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: nome }); return; }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file); a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+function validarBackup(d) {
+  if (!d || d.app !== "treino" || !Array.isArray(d.log) || !Array.isArray(d.arquivo)) throw new Error("Este arquivo não é um backup do app de treino.");
+  if (d.ficha && !Array.isArray(d.ficha.treinos)) throw new Error("A ficha deste backup está incompleta.");
+  return d;
+}
+// Soma o backup ao que já existe: nada do aparelho é perdido.
+async function mesclarBackup(d) {
+  const agora = new Date().toISOString(), arq = [...state.arquivo];
+  const ja = new Set(arq.map((a) => a.carregadaEm + "|" + a.arquivadaEm));
+  for (const a of d.arquivo) if (!ja.has(a.carregadaEm + "|" + a.arquivadaEm)) arq.push(a);
+  const mf = state.ficha;
+  if (d.ficha) {
+    if (mf && mf.carregadaEm !== d.ficha.carregadaEm && !arq.some((a) => a.carregadaEm === mf.carregadaEm)) arq.push({ ...mf, arquivadaEm: agora, id: "f" + Date.now() });
+    LS.set("ficha", d.ficha);
+  }
+  LS.set("arquivo", arq);
+  const log = [...state.log], ids = new Set(log.map((l) => l.id));
+  for (const l of d.log) if (!ids.has(l.id)) log.push(l);
+  LS.set("log", log);
+  if (d.config) LS.set("config", d.config);
+  if (d.opts) { Object.assign(opts, d.opts); LS.set("opts", opts); atualizarLinks(); }
+  await carregar();
+}
+
+function renderBackup() {
+  const r = state.restaurar;
+  return `<div class="card" id="card-backup"><h2>Backup dos dados<small>Ficha, fichas anteriores, check-ins e ajustes. A chave do ExerciseDB não entra no arquivo.</small></h2>
+    ${r ? `<p>Backup de ${fmtData(r.geradoEm)}: ${r.ficha ? "ficha “" + esc(r.ficha.titulo) + "”, " : ""}${r.arquivo.length} ficha(s) anterior(es) e ${r.log.length} check-in(s).</p>
+      <p>Os dados serão somados aos deste aparelho. Se a ficha for diferente, a atual vai para Treinos anteriores.</p>
+      <div class="row"><button class="btn ghost" data-bkcancelar>Cancelar</button><button class="btn" data-bkconfirmar>Restaurar</button></div>`
+    : `<div class="row"><button class="btn ghost" data-bkexportar>Exportar backup</button>
+      <label class="btn ghost" for="bkin">Restaurar backup<input type="file" id="bkin" accept="application/json,.json"></label></div>
+      <p>No iPhone, o Safari e o app da Tela de Início guardam dados separados, e apagar o ícone apaga os dados dele. Exporte um backup de vez em quando e salve em Arquivos.</p>`}</div>`;
+}
+
 function renderNovaFicha() {
   const nf = novaFicha, f = state.ficha;
   return `<div class="card novo" id="card-nova"><h2>Nova ficha<small>Monte a ficha aqui mesmo. Depois de criar, você adiciona os exercícios de cada dia na página Treino.</small></h2>
@@ -1514,7 +1566,8 @@ function renderAjustes() {
       <label class="btn ghost" for="pdfin">Enviar novo PDF<input type="file" id="pdfin" accept="application/pdf,.pdf"></label>
     </div>
     <p>No app Notas, abra a ficha, toque em Compartilhar › Imprimir › Salvar PDF (ou Exportar como PDF) e envie aqui.</p>
-    ${db ? "" : `<p>A ficha, o arquivo e o log ficam salvos neste iPhone. Baixe o PDF das fichas anteriores para guardar uma cópia.</p>`}</div>`;
+    </div>`;
+  if (!db) h += renderBackup();
   {
     const d = f ? f.treinos.reduce((a, t) => a + t.exercicios.reduce((b, e) => b + duvidas(e), 0), 0) : 0;
     const uso = LS.get("edbUso", {}), usoMes = uso.mes === mesAtual() ? uso.n || 0 : 0;
@@ -1764,6 +1817,18 @@ document.addEventListener("click", async (ev) => {
   }
 
   // Ficha nova
+  if (el("[data-bkexportar]")) { exportarBackup(); return; }
+  if (el("[data-bkcancelar]")) { state.restaurar = null; render(); return; }
+  if ((b = el("[data-bkconfirmar]"))) {
+    b.disabled = true;
+    try {
+      await mesclarBackup(state.restaurar);
+      state.restaurar = null; state.tab = hojeIdx() ?? 0;
+      await iniciarCatalogo();
+      location.hash = "treino"; irPara("treino"); toast("Backup restaurado.");
+    } catch (err) { b.disabled = false; toast("Não consegui restaurar (" + (err.message || "erro") + ")."); }
+    return;
+  }
   if (el("[data-novaficha]")) { abrirNovaFicha(); return; }
   if (el("[data-nfcancelar]")) { novaFicha = null; render(); return; }
   if ((b = el("[data-nfcriar]"))) {
@@ -1838,6 +1903,16 @@ document.addEventListener("change", async (ev) => {
     e.nome = nomeDasPartes(e.partes);
     try { await salvarFichaAtual(); toast("Exercício definido."); } catch (err) { toast("Não consegui salvar (" + (err.code || err.message) + ")."); }
     render(); return;
+  }
+  if (t.id === "bkin") {
+    const arq = t.files && t.files[0];
+    if (!arq) return;
+    try {
+      state.restaurar = validarBackup(JSON.parse(await arq.text()));
+      if (state.page !== "ajustes") { location.hash = "ajustes"; state.page = "ajustes"; }
+      render(); $("card-backup")?.scrollIntoView({ block: "start" });
+    } catch (err) { toast(err instanceof SyntaxError ? "Este arquivo não é um backup válido." : err.message); }
+    return;
   }
   if (t.id === "nf-dias" && novaFicha) { lerNovaFicha(); novaFicha.dias = +t.value; render(); return; }
   if (t.name === "nf-base" && novaFicha) { novaFicha.base = t.value; return; }
